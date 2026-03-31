@@ -9,64 +9,85 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// الاتصال بقاعدة البيانات مع طباعة تفصيلية للخطأ
-const MONGO_URI = process.env.MONGO_URI;
-
-if (!MONGO_URI) {
-    console.error('CRITICAL: MONGO_URI is not defined in Render environment!');
-}
-
-mongoose.connect(MONGO_URI)
+// الاتصال بقاعدة البيانات
+mongoose.connect(process.env.MONGO_URI)
   .then(() => {
-    console.log('✅ Connected to MongoDB Atlas Successfully');
+    console.log('✅ Connected to MongoDB Atlas');
     autoSeedAdmin();
   })
-  .catch(err => {
-    console.error('❌ DATABASE CONNECTION ERROR:', err.message);
-  });
+  .catch(err => console.error('❌ DB Connection Error:', err.message));
 
-// ... (نفس السكيمات السابقة) ...
-const AdminSchema = new mongoose.Schema({
+// Schemas
+const User = mongoose.model('User', new mongoose.Schema({
+  deviceId: { type: String, unique: true },
+  lastSync: { type: Date, default: Date.now },
+  activeStatus: { type: String, default: 'Idle' },
+  readingStats: { totalMinutes: { type: Number, default: 0 } },
+  shelves: Array, books: Array, habit: Object
+}));
+
+const Admin = mongoose.model('Admin', new mongoose.Schema({
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['super_admin', 'admin'], default: 'admin' }
-});
-const Admin = mongoose.model('Admin', AdminSchema);
+}));
 
+// دالة إنشاء الأدمن تلقائياً
 async function autoSeedAdmin() {
-  try {
-    const email = 'oussama.sebrou@gmail.com';
-    const existing = await Admin.findOne({ email });
-    if (!existing) {
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash('monaliza12', salt);
-        await new Admin({ email, password: hashedPassword, role: 'super_admin' }).save();
-        console.log('🛡️ Super Admin logic finished.');
-    }
-  } catch (err) { console.error('Seed Error:', err.message); }
+  const email = 'oussama.sebrou@gmail.com';
+  const existing = await Admin.findOne({ email });
+  if (!existing) {
+      const hashedPassword = await bcrypt.hash('monaliza12', 10);
+      await new Admin({ email, password: hashedPassword, role: 'super_admin' }).save();
+      console.log('🛡️ Admin seeded successfully.');
+  }
 }
 
-// تعديل اللوجن لطباعة الخطأ الحقيقي
-app.post('/api/admin/login', async (req, res) => {
+// Middleware للتحقق من التوكن
+const auth = (req, res, next) => {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return res.status(401).send('Access Denied');
+    try {
+      req.admin = jwt.verify(token, process.env.JWT_SECRET || 'monaliza12_secret');
+      next();
+    } catch (err) { res.status(401).send('Invalid Token'); }
+};
+
+// --- الـ Routes (لاحظ أننا جعلناها تدعم المسارات بوضوح) ---
+
+// 1. تسجيل الدخول
+app.post(['/api/admin/login', '/admin/login'], async (req, res) => {
   const { email, password } = req.body;
-  
-  try {
-    const admin = await Admin.findOne({ email });
-    if (!admin) return res.status(400).send('Invalid Credentials (User not found)');
-
-    const validPass = await bcrypt.compare(password, admin.password);
-    if (!validPass) return res.status(400).send('Invalid Credentials (Password mismatch)');
-
-    const token = jwt.sign({ _id: admin._id, role: admin.role }, process.env.JWT_SECRET || 'monaliza12_secret');
-    res.json({ token, role: admin.role });
-  } catch (err) {
-    console.error('Login Route Error:', err.message); // هذا السطر سيخبرنا بالسبب الحقيقي في الـ Logs
-    res.status(500).send('Server Error: ' + err.message);
-  }
+  const admin = await Admin.findOne({ email });
+  if (!admin) return res.status(400).send('User not found');
+  const validPass = await bcrypt.compare(password, admin.password);
+  if (!validPass) return res.status(400).send('Invalid Password');
+  const token = jwt.sign({ _id: admin._id, role: admin.role }, process.env.JWT_SECRET || 'monaliza12_secret');
+  res.json({ token, role: admin.role });
 });
 
-// ... باقي المسارات السابقة ...
-app.get('/', (req, res) => res.send('Sanctuary API is Running...'));
+// 2. المزامنة (APK Sync)
+app.post(['/api/sync', '/sync'], async (req, res) => {
+  const { deviceId, data } = req.body;
+  await User.findOneAndUpdate({ deviceId }, { ...data, lastSync: new Date() }, { upsert: true });
+  res.json({ success: true });
+});
+
+// 3. الإحصائيات (Metrics)
+app.get(['/api/admin/metrics', '/admin/metrics'], auth, async (req, res) => {
+  const totalUsers = await User.countDocuments();
+  const activeCount = await User.countDocuments({ lastSync: { $gte: new Date(Date.now() - 60000) } });
+  res.json({ totalUsers, activeCount });
+});
+
+// 4. قائمة المستخدمين
+app.get(['/api/admin/users', '/admin/users'], auth, async (req, res) => {
+  const users = await User.find().sort({ lastSync: -1 });
+  res.json(users);
+});
+
+// اختبار عمل السيرفر عند فتحه بالمتصفح مباشرة
+app.get('/', (req, res) => res.send('🚀 Sanctuary Backend is Live!'));
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 API Running on port ${PORT}`));
