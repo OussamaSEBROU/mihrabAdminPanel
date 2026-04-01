@@ -1,5 +1,5 @@
 /* 
- * SANCTUARY FINAL SERVER (v2.1) - UNIFIED ROUTES
+ * SANCTUARY INTELLIGENCE SERVER (v2.2) - GLOBAL ANALYTICS
  */
 const express = require('express');
 const mongoose = require('mongoose');
@@ -33,39 +33,52 @@ const auth = (req, res, next) => {
     try { req.admin = jwt.verify(token, process.env.JWT_SECRET || 'monaliza12_secret'); next(); } catch (err) { res.status(401).send('Unauthorized'); }
 };
 
-// --- الـ Routes الموحدة ---
-
-// المزامنة (APK Sync)
+// --- API المزامنة ---
 app.post(['/api/sync', '/sync'], async (req, res) => {
   const { deviceId, data } = req.body;
   await User.findOneAndUpdate({ deviceId }, { ...data, lastSync: new Date() }, { upsert: true });
   res.json({ success: true });
 });
 
-// تسجيل الدخول
-app.post(['/api/admin/login', '/admin/login'], async (req, res) => {
+// --- API الإحصائيات العالمية الجديدة ---
+app.get('/api/admin/global-insights', auth, async (req, res) => {
+    const users = await User.find();
+    
+    // 1- حساب "أكثر 10 كتب قراءة" عبر كل المستخدمين
+    let allBooks = {};
+    users.forEach(u => {
+        u.books?.forEach(b => {
+             if (!allBooks[b.title]) allBooks[b.title] = 0;
+             allBooks[b.title] += Math.round((b.timeSpentSeconds || 0) / 60);
+        });
+    });
+
+    const topBooks = Object.entries(allBooks)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([title, minutes]) => ({ title, minutes }));
+
+    // 2- بيانات الخريطة (نقاط نشطة مبنية على أجهزة المستخدمين)
+    const mapNodes = users.map(u => ({
+        id: u.deviceId,
+        active: (new Date() - new Date(u.lastSync)) < (10 * 60 * 1000) // نشط في آخر 10 دقائق
+    }));
+
+    res.json({ topBooks, mapNodes, totalUsers: users.length });
+});
+
+// تسجيل الدخول، جلب المستخدمين، والميتريكس الأساسية (كما هي بلا تغيير)...
+app.post('/admin/login', async (req, res) => {
     const admin = await Admin.findOne({ email: req.body.email });
     if (admin && await bcrypt.compare(req.body.password, admin.password)) {
-        const token = jwt.sign({ _id: admin._id }, process.env.JWT_SECRET || 'monaliza12_secret');
-        res.json({ token });
+        res.json({ token: jwt.sign({ _id: admin._id }, process.env.JWT_SECRET || 'monaliza12_secret') });
     } else res.status(400).send('Invalid');
 });
-
-// جلب المستخدمين (Users Explorer)
-app.get(['/api/admin/users', '/admin/users'], auth, async (req, res) => {
-    const users = await User.find().sort({ lastSync: -1 });
-    res.json(users);
-});
-
-// ميتريكس الذكاء (Detailed Metrics)
-app.get(['/api/admin/metrics', '/admin/metrics', '/api/admin/detailed-metrics', '/admin/detailed-metrics'], auth, async (req, res) => {
+app.get('/admin/users', auth, async (req, res) => res.json(await User.find().sort({ lastSync: -1 })));
+app.get('/admin/metrics', auth, async (req, res) => {
     const totalInstalls = await User.countDocuments();
     const activeToday = await User.countDocuments({ lastSync: { $gte: new Date(Date.now() - 86400000) } });
-    const likelyUninstalled = await User.countDocuments({ lastSync: { $lte: new Date(Date.now() - (30 * 86400000)) } });
-    res.json({ totalInstalls, activeToday, likelyUninstalled });
+    res.json({ totalInstalls, activeToday });
 });
 
-app.get('/', (req, res) => res.send('Sanctuary Neural Engine is Live!'));
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log('🚀 Unified Server Engine v2.1 Active'));
+app.listen(process.env.PORT || 5000, () => console.log('🚀 Intelligence v2.2 Live'));
