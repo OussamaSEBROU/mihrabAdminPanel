@@ -14,7 +14,18 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-mongoose.connect(process.env.MONGO_URI);
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('✅ Connected to MongoDB Cloud'))
+  .catch(err => console.error('❌ MongoDB Connection Error:', err));
+
+// ===== DIAGNOSTIC ENDPOINT =====
+app.get('/', (req, res) => {
+    res.send(`🚀 Mihrab Backend v4.0 is ALIVE! <br> Time: ${new Date().toISOString()} <br> Status: Database Connected`);
+});
+
+app.get('/api/test', (req, res) => {
+    res.json({ status: 'online', message: 'API is reachable', timestamp: new Date() });
+});
 
 // ===== ENHANCED USER SCHEMA — Matches APK syncBridge payload exactly =====
 const BookSubSchema = new mongoose.Schema({
