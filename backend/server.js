@@ -98,14 +98,34 @@ const auth = (req, res, next) => {
     try { req.admin = jwt.verify(token, process.env.JWT_SECRET || 'monaliza12_secret'); next(); } catch (err) { res.status(401).send('Unauthorized'); }
 };
 
+// ===== DATABASE CLEANUP & PRECISION FIX =====
+const cleanupData = async () => {
+    try {
+        const users = await User.find({});
+        for (let user of users) {
+            if (user.readingStats && user.readingStats.totalMinutes % 1 !== 0) {
+                user.readingStats.totalMinutes = Math.round(user.readingStats.totalMinutes);
+                await user.save();
+            }
+        }
+        console.log('✅ Data precision cleanup completed');
+    } catch (e) {}
+};
+cleanupData();
+
 // ===== GEO-IP LOOKUP (Free, no API key needed) =====
 const getGeoFromIP = async (ip) => {
     try {
-        // Clean up IP for local/proxy scenarios
-        const cleanIP = ip === '::1' || ip === '127.0.0.1' ? '' : ip.replace('::ffff:', '');
+        const cleanIP = ip === '::1' || ip === '127.0.0.1' ? '' : ip.split(',')[0].replace('::ffff:', '').trim();
         if (!cleanIP) return null;
         
-        const response = await fetch(`http://ip-api.com/json/${cleanIP}?fields=country,city,regionName,lat,lon,timezone`);
+        // Use timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        const response = await fetch(`http://ip-api.com/json/${cleanIP}?fields=country,city,regionName,lat,lon,timezone`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         if (response.ok) {
             const data = await response.json();
             if (data.country) {
@@ -119,7 +139,9 @@ const getGeoFromIP = async (ip) => {
                 };
             }
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error('Geo lookup failed:', e.message);
+    }
     return null;
 };
 
