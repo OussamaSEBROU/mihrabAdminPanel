@@ -1,71 +1,350 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Activity, LogOut, Smartphone, BookOpen, Layers, X, ChevronRight, Download, FileSpreadsheet, FileJson, Clock, ShieldCheck, MapPin, RefreshCw, Globe, BarChart3, Library } from 'lucide-react';
+import { Users, Activity, LogOut, Smartphone, BookOpen, Layers, X, ChevronRight, Download, FileSpreadsheet, FileJson, Clock, ShieldCheck, MapPin, RefreshCw, Globe, BarChart3, Library, Languages } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'https://mihrab-backend.onrender.com/api';
 const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
 
+// ===== TRANSLATIONS =====
+const translations = {
+  ar: {
+    title: "لوحة تحكم المحراب",
+    overview: "نظرة عامة",
+    users: "المستخدمون",
+    installs: "التثبيتات",
+    activeToday: "نشط اليوم",
+    now: "الآن",
+    totalMinutes: "الدقائق الكلية",
+    books: "الكتب",
+    shelves: "الرفوف",
+    updatedUsers: "محدّثون",
+    thisWeek: "هذا الأسبوع",
+    recentActivity: "آخر النشاطات",
+    connected: "متصل",
+    userNode: "مستخدم",
+    minutes: "دقيقة",
+    idle: "خامل",
+    syncing: "مزامنة...",
+    lastUpdate: "آخر تحديث",
+    refresh: "تحديث",
+    exportCSV: "تصدير CSV",
+    backupJSON: "نسخ JSON",
+    logout: "خروج",
+    userDetail: "تفاصيل المستخدم",
+    installDate: "تاريخ التثبيت",
+    lastSync: "آخر مزامنة",
+    status: "الحالة",
+    appVersion: "إصدار التطبيق",
+    updated: "محدّث",
+    location: "الموقع",
+    timezone: "المنطقة الزمنية",
+    yes: "نعم",
+    no: "لا",
+    unknown: "غير معروف",
+    noBooks: "لا توجد كتب",
+    lastRead: "آخر قراءة",
+    added: "أضيف في",
+    focusTime: "إجمالي وقت القراءة",
+    downloads: "التحميلات",
+    justNow: "الآن",
+    minAgo: "منذ {n} د",
+    hourAgo: "منذ {n} س",
+    dayAgo: "منذ {n} يوم"
+  },
+  en: {
+    title: "Mihrab Admin Panel",
+    overview: "Overview",
+    users: "Users",
+    installs: "Installs",
+    activeToday: "Active Today",
+    now: "Now",
+    totalMinutes: "Total Minutes",
+    books: "Books",
+    shelves: "Shelves",
+    updatedUsers: "Updated",
+    thisWeek: "This Week",
+    recentActivity: "Recent Activity",
+    connected: "Online",
+    userNode: "Node",
+    minutes: "min",
+    idle: "Idle",
+    syncing: "Syncing...",
+    lastUpdate: "Last Update",
+    refresh: "Refresh",
+    exportCSV: "Export CSV",
+    backupJSON: "Backup JSON",
+    logout: "Logout",
+    userDetail: "User Details",
+    installDate: "Install Date",
+    lastSync: "Last Sync",
+    status: "Status",
+    appVersion: "App Version",
+    updated: "Updated",
+    location: "Location",
+    timezone: "Timezone",
+    yes: "Yes",
+    no: "No",
+    unknown: "Unknown",
+    noBooks: "No books found",
+    lastRead: "Last Read",
+    added: "Added",
+    focusTime: "Total Focus Time",
+    downloads: "Downloads",
+    justNow: "Just now",
+    minAgo: "{n}m ago",
+    hourAgo: "{n}h ago",
+    dayAgo: "{n}d ago"
+  }
+};
+
 // ===== HELPER FUNCTIONS =====
-const fmt = (ts: any) => ts ? new Date(ts).toLocaleString('ar-DZ', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-const fmtDate = (ts: any) => ts ? new Date(ts).toLocaleDateString('ar-DZ') : '—';
 const secToMin = (s: number) => Math.round((s || 0) / 60);
-const ago = (ts: any) => {
-  if (!ts) return '—';
-  const diff = Date.now() - new Date(ts).getTime();
-  if (diff < 60000) return 'الآن';
-  if (diff < 3600000) return `منذ ${Math.floor(diff/60000)} د`;
-  if (diff < 86400000) return `منذ ${Math.floor(diff/3600000)} س`;
-  return `منذ ${Math.floor(diff/86400000)} يوم`;
-};
 
-// ===== PER-USER CSV/JSON EXPORT =====
-const exportUserCSV = (u: any) => {
-  const lines = ['\uFEFF"Mihrab User Report"', `"Device","${u.deviceId}"`, `"Install","${fmtDate(u.installDate)}"`,
-    `"Last Sync","${fmt(u.lastSync)}"`, `"Status","${u.activeStatus||'Idle'}"`,
-    `"Total Minutes","${u.readingStats?.totalMinutes||0}"`, `"Total Books","${u.books?.length||0}"`,
-    `"Total Shelves","${u.shelves?.length||0}"`, `"Total Downloads","${u.totalDownloads||0}"`,
-    `"App Version","${u.appVersion||'?'}"`, `"Updated","${u.hasUpdated?'Yes':'No'}"`, 
-    `"Location","${u.location?.country||'?'}, ${u.location?.city||'?'}"`,
-    '', '"Book Title","Shelf","Minutes","Stars","Last Read","Added"'];
-  u.books?.forEach((b:any) => {
-    lines.push(`"${b.title}","${u.shelves?.find((s:any)=>s.id===b.shelfId)?.name||b.shelfId}","${secToMin(b.timeSpentSeconds)}","${b.stars||0}","${b.lastReadAt?fmt(b.lastReadAt):'—'}","${b.addedAt?fmtDate(b.addedAt):'—'}"`);
-  });
-  lines.push('', '"Shelf","Color","Books Count"');
-  u.shelves?.forEach((s:any) => {
-    const cnt = u.books?.filter((b:any)=>b.shelfId===s.id).length||0;
-    lines.push(`"${s.name}","${s.color}","${cnt}"`);
-  });
-  dl(lines.join('\n'), `User_${u.deviceId.slice(0,8)}.csv`, 'text/csv;charset=utf-8;');
-};
+const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
+  const [lang, setLang] = useState<'ar'|'en'>((localStorage.getItem('admin_lang') as any) || 'ar');
+  const t = translations[lang];
+  const isAr = lang === 'ar';
 
-const exportUserJSON = (u: any) => {
-  dl(JSON.stringify(u, null, 2), `User_${u.deviceId.slice(0,8)}.json`, 'application/json');
-};
+  const [view, setView] = useState<'overview'|'users'>('overview');
+  const [users, setUsers] = useState<any[]>([]);
+  const [sel, setSel] = useState<any>(null);
+  const [stats, setStats] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
-const dl = (content: string, name: string, type: string) => {
-  const b = new Blob([content], { type });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(b);
-  a.download = name;
-  a.click();
-};
+  const fmt = (ts: any) => ts ? new Date(ts).toLocaleString(isAr ? 'ar-DZ' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  const fmtDate = (ts: any) => ts ? new Date(ts).toLocaleDateString(isAr ? 'ar-DZ' : 'en-US') : '—';
+  
+  const ago = (ts: any) => {
+    if (!ts) return '—';
+    const diff = Date.now() - new Date(ts).getTime();
+    if (diff < 60000) return t.justNow;
+    if (diff < 3600000) return t.minAgo.replace('{n}', Math.floor(diff/60000).toString());
+    if (diff < 86400000) return t.hourAgo.replace('{n}', Math.floor(diff/3600000).toString());
+    return t.dayAgo.replace('{n}', Math.floor(diff/86400000).toString());
+  };
 
-// ===== GLOBAL CSV EXPORT =====
-const exportGlobalCSV = (users: any[]) => {
-  const hdr = ["DeviceID","InstallDate","LastSync","Status","TotalMinutes","Books","Shelves","Downloads","AppVersion","Updated","Country","City","AllBooks_Detail"];
-  const rows = users.map(u => {
-    const booksDetail = (u.books||[]).map((b:any)=>`${b.title}(${secToMin(b.timeSpentSeconds)}m)`).join(' | ');
-    return [u.deviceId, fmtDate(u.installDate), fmt(u.lastSync), u.activeStatus||'Idle',
-      u.readingStats?.totalMinutes||0, u.books?.length||0, u.shelves?.length||0, u.totalDownloads||0,
+  const toggleLang = () => {
+    const newLang = lang === 'ar' ? 'en' : 'ar';
+    setLang(newLang);
+    localStorage.setItem('admin_lang', newLang);
+  };
+
+  const fetchData = useCallback(async () => {
+    try {
+      setSyncing(true);
+      const h = headers();
+      const [uRes, mRes] = await Promise.all([
+        axios.get(`${API}/admin/users`, { headers: h }).catch(() => ({ data: [] })),
+        axios.get(`${API}/admin/metrics`, { headers: h }).catch(() => ({ data: {} }))
+      ]);
+      setUsers(uRes.data || []);
+      setStats(mRes.data || {});
+      if (sel) {
+        const fresh = (uRes.data||[]).find((u:any) => u.deviceId === sel.deviceId);
+        if (fresh) setSel(fresh);
+      }
+    } catch {} finally { setLoading(false); setSyncing(false); }
+  }, [sel]);
+
+  useEffect(() => { 
+    fetchData(); 
+    const iv = setInterval(fetchData, 20000); 
+    return () => clearInterval(iv); 
+  }, [fetchData]);
+
+  // ===== EXPORTS =====
+  const dl = (content: string, name: string, type: string) => {
+    const b = new Blob([content], { type });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = name;
+    a.click();
+  };
+
+  const exportUserCSV = (u: any) => {
+    const lines = ['\uFEFF"Mihrab User Report"', `"Device","${u.deviceId}"`, `"Install","${fmtDate(u.installDate)}"`,
+      `"Last Sync","${fmt(u.lastSync)}"`, `"Status","${u.activeStatus||'Idle'}"`,
+      `"Total Minutes","${u.readingStats?.totalMinutes||0}"`, `"Total Books","${u.books?.length||0}"`,
+      `"Total Shelves","${u.shelves?.length||0}"`, `"Total Downloads","${u.totalDownloads||0}"`,
+      `"App Version","${u.appVersion||'?'}"`, `"Updated","${u.hasUpdated?'Yes':'No'}"`, 
+      `"Location","${u.location?.country||'?'}, ${u.location?.city||'?'}"`,
+      '', '"Book Title","Shelf","Minutes","Stars","Last Read","Added"'];
+    u.books?.forEach((b:any) => {
+      lines.push(`"${b.title}","${u.shelves?.find((s:any)=>s.id===b.shelfId)?.name||b.shelfId}","${secToMin(b.timeSpentSeconds)}","${b.stars||0}","${b.lastReadAt?fmt(b.lastReadAt):'—'}","${b.addedAt?fmtDate(b.addedAt):'—'}"`);
+    });
+    dl(lines.join('\n'), `User_${u.deviceId.slice(0,8)}.csv`, 'text/csv;charset=utf-8;');
+  };
+
+  const exportGlobalCSV = () => {
+    const hdr = ["DeviceID","InstallDate","LastSync","Status","TotalMinutes","Books","Shelves","Downloads","AppVersion","Updated","Country","City","AllBooks_Detail"];
+    const rows = users.map(u => [
+      u.deviceId, fmtDate(u.installDate), fmt(u.lastSync), u.activeStatus||'Idle',
+      Math.round(u.readingStats?.totalMinutes||0), u.books?.length||0, u.shelves?.length||0, u.totalDownloads||0,
       u.appVersion||'?', u.hasUpdated?'Yes':'No', u.location?.country||'?', u.location?.city||'?',
-      `"${booksDetail}"`];
-  });
-  dl('\uFEFF'+[hdr,...rows].map(e=>e.join(',')).join('\n'), `Mihrab_Export_${new Date().toISOString().split('T')[0]}.csv`, `text/csv;charset=utf-8;`);
-};
+      `"${(u.books||[]).map((b:any)=>`${b.title}(${secToMin(b.timeSpentSeconds)}m)`).join(' | ')}"`
+    ]);
+    dl('\uFEFF'+[hdr,...rows].map(e=>e.join(',')).join('\n'), `Mihrab_Global_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
+  };
 
-const exportGlobalJSON = (users: any[]) => {
-  dl(JSON.stringify(users, null, 2), `Mihrab_Backup_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+  if (loading) return <div style={centerSt}>{isAr ? 'جاري التحميل...' : 'Loading Neural System...'}</div>;
+
+  return (
+    <div style={{ ...layoutSt, direction: isAr ? 'rtl' : 'ltr' }}>
+      {/* Sidebar */}
+      <aside className="glass-panel" style={{ ...sidebarSt, [isAr ? 'right' : 'left']: 0, [isAr ? 'borderLeft' : 'borderRight']: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ padding: '24px' }}>
+          <div style={logoSt}>{isAr ? 'م' : 'M'}</div>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '8px', textAlign: 'center' }}>Mihrab Admin</p>
+          <nav style={{ marginTop: '30px' }}>
+            <div onClick={() => setView('overview')} style={view === 'overview' ? navAct : navIt}><Activity size={18}/> {t.overview}</div>
+            <div onClick={() => setView('users')} style={view === 'users' ? navAct : navIt}><Users size={18}/> {t.users}</div>
+          </nav>
+        </div>
+        <div style={{ padding: '0 20px 24px' }}>
+          <button onClick={toggleLang} style={{...expBtn, marginBottom:'10px', color:'#3cff64'}}><Languages size={16}/> {isAr ? 'English' : 'العربية'}</button>
+          <button onClick={exportGlobalCSV} style={expBtn}><FileSpreadsheet size={16}/> {t.exportCSV}</button>
+          <button onClick={() => dl(JSON.stringify(users,null,2), 'Backup.json', 'application/json')} style={{...expBtn, marginTop:'8px'}}><FileJson size={16}/> {t.backupJSON}</button>
+          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginTop:'16px', color: syncing?'#3cff64':'var(--text-dim)', fontSize:'0.7rem' }}>
+            <RefreshCw size={14} className={syncing?'spin':''}/> {syncing ? t.syncing : `${t.lastUpdate}: ${new Date().toLocaleTimeString(isAr ? 'ar-DZ' : 'en-US')}`}
+          </div>
+          <button onClick={onLogout} style={logoutSt}><LogOut size={18}/> {t.logout}</button>
+        </div>
+      </aside>
+
+      {/* Main Area */}
+      <main style={{ [isAr ? 'marginRight' : 'marginLeft']: '280px', flex: 1, padding: '30px', overflowY: 'auto' }}>
+        <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 900 }}>{t.title}</h1>
+            <p style={{ color: '#3cff64', fontSize: '0.85rem' }}>{t.connected}: {users.length} {isAr ? 'مستخدم' : 'users'}</p>
+          </div>
+          <button onClick={fetchData} className="glow-btn" style={{ padding: '10px 20px', fontSize: '0.85rem' }}><RefreshCw size={16}/> {t.refresh}</button>
+        </header>
+
+        <AnimatePresence mode="wait">
+          {view === 'overview' ? (
+            <motion.div key="ov" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                <MetricCard title={t.installs} value={stats.totalInstalls||0} icon={<Smartphone color="#ff3a3a"/>}/>
+                <MetricCard title={t.activeToday} value={stats.activeToday||0} icon={<Activity color="#3cff64"/>} sub={`${stats.activeNow||0} ${t.now}`}/>
+                <MetricCard title={t.totalMinutes} value={Math.round(stats.globalMinutes||0)} icon={<Clock color="#ff3a3a"/>}/>
+                <MetricCard title={t.books} value={stats.globalBooks||0} icon={<BookOpen color="#ff9f43"/>}/>
+              </div>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <MetricCard title={t.shelves} value={stats.globalShelves||0} icon={<Library color="#a855f7"/>}/>
+                <MetricCard title={t.updatedUsers} value={stats.updatedUsers||0} icon={<ShieldCheck color="#3cff64"/>}/>
+                <MetricCard title={t.thisWeek} value={stats.activeThisWeek||0} icon={<BarChart3 color="#38bdf8"/>}/>
+                <MetricCard title={t.downloads} value={stats.globalDownloads||0} icon={<Download color="#ff3a3a"/>}/>
+              </div>
+
+              <div className="glass-panel" style={{ marginTop: '24px', padding: '24px' }}>
+                <h3 style={{ marginBottom: '16px' }}>{t.recentActivity}</h3>
+                {users.slice(0, 8).map(u => (
+                  <div key={u._id} onClick={() => { setSel(u); setView('users'); }} style={rowSt}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
+                      <div style={avSt}><Smartphone size={16}/></div>
+                      <div>
+                        <h4 style={{ fontWeight: 700, fontSize: '0.9rem' }}>{t.userNode}_{u.deviceId?.slice(0,8)}</h4>
+                        <p style={{ fontSize: '0.75rem', color: '#999' }}>{ago(u.lastSync)} • {u.books?.length||0} {t.books} • {Math.round(u.readingStats?.totalMinutes||0)} {t.minutes}</p>
+                      </div>
+                    </div>
+                    <span style={{ color: u.activeStatus?.startsWith('Reading')?'#3cff64':'#666', fontSize:'0.75rem', fontWeight:800, textAlign: isAr ? 'left' : 'right' }}>{u.activeStatus||t.idle}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div key="us" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <div className="glass-panel" style={{ padding: '24px' }}>
+                <h3 style={{ marginBottom: '20px' }}>{t.users} ({users.length})</h3>
+                {users.map(u => (
+                  <div key={u._id} style={rowSt} onClick={() => setSel(u)}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'14px', flex:1 }}>
+                      <div style={avSt}><Smartphone size={16}/></div>
+                      <div style={{ flex:1 }}>
+                        <h4 style={{ fontWeight: 700, fontSize: '0.9rem' }}>{u.deviceId?.slice(0,14)}</h4>
+                        <p style={{ fontSize: '0.72rem', color: '#999' }}>
+                          {ago(u.lastSync)} • {u.books?.length||0} {t.books} • {Math.round(u.readingStats?.totalMinutes||0)} {t.minutes}
+                          {u.location?.country ? ` • 📍${u.location.country}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
+                      <span style={{ color: u.activeStatus?.startsWith('Reading')?'#3cff64':'#666', fontSize:'0.7rem', fontWeight:800, marginInlineEnd:'8px' }}>{u.activeStatus||t.idle}</span>
+                      <button onClick={(e) => { e.stopPropagation(); exportUserCSV(u); }} style={smBtn}><FileSpreadsheet size={14}/></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {/* Modal User Detail */}
+      <AnimatePresence>
+        {sel && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={ovSt}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="glass-panel" style={mdSt}>
+              <div style={{ position:'absolute', top:20, [isAr ? 'left' : 'right']: 20, display:'flex', gap:'10px' }}>
+                <button onClick={() => exportUserCSV(sel)} style={smBtn}><FileSpreadsheet size={18}/></button>
+                <div style={{ cursor:'pointer' }} onClick={() => setSel(null)}><X size={26}/></div>
+              </div>
+
+              <h2 style={{ fontSize: '1.3rem', marginBottom: '6px', fontWeight: 900 }}>{t.userDetail}</h2>
+              <p style={{ fontSize: '0.8rem', color: '#999', marginBottom: '24px' }}>{sel.deviceId}</p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+                {[
+                  [t.installDate, fmtDate(sel.installDate)],
+                  [t.lastSync, ago(sel.lastSync)],
+                  [t.status, sel.activeStatus||t.idle],
+                  [t.focusTime, `${Math.round(sel.readingStats?.totalMinutes||0)} ${t.minutes}`],
+                  [t.appVersion, sel.appVersion||t.unknown],
+                  [t.updated, sel.hasUpdated ? t.yes : t.no],
+                  [t.location, sel.location?.country ? `${sel.location.city}, ${sel.location.country}` : t.unknown],
+                  [t.timezone, sel.location?.timezone||'—'],
+                ].map(([k,v], i) => (
+                  <div key={i} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px' }}>
+                    <p style={{ fontSize: '0.65rem', color: '#888', textTransform: 'uppercase' }}>{k}</p>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', marginTop: '4px' }}>{v}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div>
+                  <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}><BookOpen size={16}/> {t.books}</h3>
+                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {sel.books?.map((b:any) => (
+                      <div key={b.id} style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', marginBottom: '8px', borderInlineStart: `3px solid ${sel.shelves?.find((s:any)=>s.id===b.shelfId)?.color||'#ff3c3c'}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{b.title}</span>
+                          <span style={{ color: 'var(--accent)', fontWeight: 900 }}>{secToMin(b.timeSpentSeconds)} {t.minutes}</span>
+                        </div>
+                        <p style={{ fontSize: '0.7rem', color: '#888', marginTop: '4px' }}>{t.lastRead}: {b.lastReadAt ? ago(b.lastReadAt) : '—'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}><Layers size={16}/> {t.shelves}</h3>
+                  {sel.shelves?.map((s:any) => (
+                    <div key={s.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', marginBottom: '8px', borderInlineStart: `3px solid ${s.color}` }}>
+                      <p style={{ fontWeight: 800, color: s.color }}>{s.name}</p>
+                      <p style={{ fontSize: '0.75rem', color: '#999' }}>{sel.books?.filter((b:any)=>b.shelfId===s.id).length} {isAr ? 'كتب' : 'books'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 };
 
 // ===== METRIC CARD =====
@@ -80,212 +359,23 @@ const MetricCard = ({ title, value, icon, sub }: any) => (
   </div>
 );
 
-// ===== MAIN DASHBOARD =====
-const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const [view, setView] = useState<'overview'|'users'>('overview');
-  const [users, setUsers] = useState<any[]>([]);
-  const [sel, setSel] = useState<any>(null);
-  const [stats, setStats] = useState<any>({});
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+// ===== STYLES =====
+const sidebarSt: React.CSSProperties = { width:'280px', height:'100vh', position:'fixed', display:'flex', flexDirection:'column', justifyContent:'space-between', zIndex:10 };
+const layoutSt: React.CSSProperties = { display:'flex', background:'#050505', minHeight:'100vh', color:'#fff' };
+const logoSt: React.CSSProperties = { width:'50px', height:'50px', background:'#ff3c3c', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.8rem', fontWeight:900, margin:'0 auto' };
+const navIt: React.CSSProperties = { display:'flex', alignItems:'center', gap:'12px', padding:'12px 20px', borderRadius:'12px', cursor:'pointer', color:'rgba(255,255,255,0.5)', transition:'0.3s', marginBottom:'6px', fontSize:'0.9rem' };
+const navAct = { ...navIt, background:'rgba(255,60,60,0.1)', color:'#ff3c3c', fontWeight:800 } as React.CSSProperties;
+const expBtn: React.CSSProperties = { width:'100%', padding:'10px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', borderRadius:'10px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', fontSize:'0.8rem' };
+const logoutSt: React.CSSProperties = { background:'none', border:'none', color:'#ff3c3c', cursor:'pointer', fontWeight:700, padding:'20px 0 0', display:'flex', alignItems:'center', gap:'8px', fontSize:'0.85rem' };
+const rowSt: React.CSSProperties = { padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer', borderRadius:'14px', background:'rgba(255,255,255,0.02)', marginBottom:'8px', transition:'0.2s' };
+const avSt: React.CSSProperties = { width:'40px', height:'40px', borderRadius:'50%', background:'rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff3c3c' };
+const ovSt: React.CSSProperties = { position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.92)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' };
+const mdSt: React.CSSProperties = { width:'1000px', maxWidth:'95vw', maxHeight:'90vh', padding:'40px', borderRadius:'28px', position:'relative', overflowY:'auto' };
+const centerSt: React.CSSProperties = { height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#050505', color:'white', fontWeight:900, letterSpacing:'2px', fontSize:'1.2rem' };
+const smBtn: React.CSSProperties = { background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', borderRadius:'8px', cursor:'pointer', padding:'6px 8px', display:'flex', alignItems:'center' };
 
-  const fetchData = useCallback(async () => {
-    try {
-      setSyncing(true);
-      const h = headers();
-      const [uRes, mRes] = await Promise.all([
-        axios.get(`${API}/admin/users`, { headers: h }).catch(() => ({ data: [] })),
-        axios.get(`${API}/admin/metrics`, { headers: h }).catch(() => ({ data: {} }))
-      ]);
-      setUsers(uRes.data || []);
-      setStats(mRes.data || {});
-      // If a user detail is open, refresh it
-      if (sel) {
-        const fresh = (uRes.data||[]).find((u:any) => u.deviceId === sel.deviceId);
-        if (fresh) setSel(fresh);
-      }
-    } catch {} finally { setLoading(false); setSyncing(false); }
-  }, [sel]);
-
-  useEffect(() => { fetchData(); const iv = setInterval(fetchData, 15000); return () => clearInterval(iv); }, []);
-
-  if (loading) return <div style={centerSt}>جاري تهيئة النظام...</div>;
-
-  return (
-    <div style={layoutSt}>
-      {/* Sidebar */}
-      <aside className="glass-panel" style={sidebarSt}>
-        <div style={{ padding: '24px' }}>
-          <div style={logoSt}>م</div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '8px', textAlign: 'center' }}>Mihrab Admin</p>
-          <nav style={{ marginTop: '30px' }}>
-            <div onClick={() => setView('overview')} style={view === 'overview' ? navAct : navIt}><Activity size={18}/> نظرة عامة</div>
-            <div onClick={() => setView('users')} style={view === 'users' ? navAct : navIt}><Users size={18}/> المستخدمون</div>
-          </nav>
-        </div>
-        <div style={{ padding: '0 20px 24px' }}>
-          <button onClick={() => exportGlobalCSV(users)} style={expBtn}><FileSpreadsheet size={16}/> تصدير CSV</button>
-          <button onClick={() => exportGlobalJSON(users)} style={{...expBtn, marginTop:'8px'}}><FileJson size={16}/> نسخ احتياطي JSON</button>
-          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginTop:'16px', color: syncing?'#3cff64':'var(--text-dim)', fontSize:'0.75rem' }}>
-            <RefreshCw size={14} className={syncing?'spin':''}/> {syncing ? 'مزامنة...' : `آخر تحديث: ${new Date().toLocaleTimeString('ar-DZ')}`}
-          </div>
-          <button onClick={onLogout} style={logoutSt}><LogOut size={18}/> خروج</button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main style={{ marginLeft: '280px', flex: 1, padding: '30px', overflowY: 'auto' }}>
-        <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ fontSize: '2rem', fontWeight: 900 }}>لوحة تحكم المحراب</h1>
-            <p style={{ color: '#3cff64', fontSize: '0.85rem' }}>متصل: {users.length} مستخدم</p>
-          </div>
-          <button onClick={fetchData} className="glow-btn" style={{ padding: '10px 20px', fontSize: '0.85rem' }}><RefreshCw size={16}/> تحديث</button>
-        </header>
-
-        <AnimatePresence mode="wait">
-          {view === 'overview' ? (
-            <motion.div key="ov" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                <MetricCard title="التثبيتات" value={stats.totalInstalls||0} icon={<Smartphone color="#ff3a3a"/>}/>
-                <MetricCard title="نشط اليوم" value={stats.activeToday||0} icon={<Activity color="#3cff64"/>} sub={`${stats.activeNow||0} الآن`}/>
-                <MetricCard title="الدقائق الكلية" value={stats.globalMinutes||0} icon={<Clock color="#ff3a3a"/>}/>
-                <MetricCard title="الكتب" value={stats.globalBooks||0} icon={<BookOpen color="#ff9f43"/>}/>
-              </div>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                <MetricCard title="الرفوف" value={stats.globalShelves||0} icon={<Library color="#a855f7"/>}/>
-                <MetricCard title="محدّثون" value={stats.updatedUsers||0} icon={<ShieldCheck color="#3cff64"/>}/>
-                <MetricCard title="هذا الأسبوع" value={stats.activeThisWeek||0} icon={<BarChart3 color="#38bdf8"/>}/>
-              </div>
-              {/* Recent Users */}
-              <div className="glass-panel" style={{ marginTop: '24px', padding: '24px' }}>
-                <h3 style={{ marginBottom: '16px' }}>آخر النشاطات</h3>
-                {users.slice(0, 8).map(u => (
-                  <div key={u._id} onClick={() => { setSel(u); setView('users'); }} style={rowSt}>
-                    <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
-                      <div style={avSt}><Smartphone size={16}/></div>
-                      <div>
-                        <h4 style={{ fontWeight: 700, fontSize: '0.9rem' }}>{u.deviceId?.slice(0,12)}...</h4>
-                        <p style={{ fontSize: '0.75rem', color: '#999' }}>{ago(u.lastSync)} • {u.books?.length||0} كتاب • {secToMin(u.books?.reduce((a:number,b:any)=>a+(b.timeSpentSeconds||0),0)||0)} د</p>
-                      </div>
-                    </div>
-                    <span style={{ color: u.activeStatus?.startsWith('Reading')?'#3cff64':'#666', fontSize:'0.75rem', fontWeight:800 }}>{u.activeStatus||'Idle'}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div key="us" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <div className="glass-panel" style={{ padding: '24px' }}>
-                <h3 style={{ marginBottom: '20px' }}>جميع المستخدمين ({users.length})</h3>
-                {users.map(u => (
-                  <div key={u._id} style={rowSt}>
-                    <div style={{ display:'flex', alignItems:'center', gap:'14px', flex:1, cursor:'pointer' }} onClick={() => setSel(u)}>
-                      <div style={avSt}><Smartphone size={16}/></div>
-                      <div style={{ flex:1 }}>
-                        <h4 style={{ fontWeight: 700, fontSize: '0.9rem' }}>{u.deviceId?.slice(0,14)}</h4>
-                        <p style={{ fontSize: '0.72rem', color: '#999' }}>
-                          {ago(u.lastSync)} • {u.books?.length||0} كتاب • {u.shelves?.length||0} رف • {u.readingStats?.totalMinutes||0} د قراءة
-                          {u.location?.country ? ` • 📍${u.location.country}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                    <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
-                      <span style={{ color: u.activeStatus?.startsWith('Reading')?'#3cff64':'#666', fontSize:'0.7rem', fontWeight:800, marginRight:'8px' }}>{u.activeStatus||'Idle'}</span>
-                      <button onClick={(e) => { e.stopPropagation(); exportUserCSV(u); }} style={smBtn} title="CSV"><FileSpreadsheet size={14}/></button>
-                      <button onClick={(e) => { e.stopPropagation(); exportUserJSON(u); }} style={smBtn} title="JSON"><FileJson size={14}/></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-
-      {/* User Detail Modal */}
-      <AnimatePresence>
-        {sel && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={ovSt}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="glass-panel" style={mdSt}>
-              <div style={{ position:'absolute', top:20, right:20, display:'flex', gap:'10px' }}>
-                <button onClick={() => exportUserCSV(sel)} style={smBtn} title="CSV"><FileSpreadsheet size={18}/></button>
-                <button onClick={() => exportUserJSON(sel)} style={smBtn} title="JSON"><FileJson size={18}/></button>
-                <div style={{ cursor:'pointer' }} onClick={() => setSel(null)}><X size={26}/></div>
-              </div>
-
-              <h2 style={{ fontSize: '1.3rem', marginBottom: '6px', fontWeight: 900 }}>تفاصيل المستخدم</h2>
-              <p style={{ fontSize: '0.8rem', color: '#999', marginBottom: '24px', wordBreak: 'break-all' }}>{sel.deviceId}</p>
-
-              {/* Info Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-                {[
-                  ['تاريخ التثبيت', fmtDate(sel.installDate)],
-                  ['آخر مزامنة', ago(sel.lastSync)],
-                  ['الحالة', sel.activeStatus||'Idle'],
-                  ['إجمالي القراءة', `${sel.readingStats?.totalMinutes||0} دقيقة`],
-                  ['الكتب', sel.books?.length||0],
-                  ['الرفوف', sel.shelves?.length||0],
-                  ['إصدار التطبيق', sel.appVersion||'غير معروف'],
-                  ['محدّث', sel.hasUpdated?'✅ نعم':'❌ لا'],
-                  ['الموقع', sel.location?.country ? `${sel.location.city}, ${sel.location.country}` : 'غير متوفر'],
-                  ['المنطقة الزمنية', sel.location?.timezone||'—'],
-                ].map(([k,v], i) => (
-                  <div key={i} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px' }}>
-                    <p style={{ fontSize: '0.65rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{k}</p>
-                    <p style={{ fontWeight: 700, fontSize: '0.9rem', marginTop: '4px' }}>{v}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Books List */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div>
-                  <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}><BookOpen size={16} style={{verticalAlign:'middle'}}/> الكتب ({sel.books?.length||0})</h3>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {sel.books?.length ? sel.books.map((b:any) => {
-                      const shelf = sel.shelves?.find((s:any) => s.id === b.shelfId);
-                      return (
-                        <div key={b.id} style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', marginBottom: '8px', borderLeft: `3px solid ${shelf?.color||'#ff3c3c'}` }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{b.title}</span>
-                            <span style={{ color: 'var(--accent)', fontWeight: 900, fontSize: '0.85rem' }}>{secToMin(b.timeSpentSeconds)} د</span>
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '4px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                            <span>📁 {shelf?.name||b.shelfId}</span>
-                            <span>⭐ {b.stars||0}</span>
-                            <span>📖 آخر قراءة: {b.lastReadAt ? ago(b.lastReadAt) : '—'}</span>
-                            {b.lastReadDate && <span>📅 {b.lastReadDate}</span>}
-                          </div>
-                        </div>
-                      );
-                    }) : <p style={{ color: '#666', fontSize: '0.85rem' }}>لا توجد كتب</p>}
-                  </div>
-                </div>
-
-                {/* Shelves + Stats */}
-                <div>
-                  <h3 style={{ marginBottom: '14px', fontSize: '1rem' }}><Layers size={16} style={{verticalAlign:'middle'}}/> الرفوف ({sel.shelves?.length||0})</h3>
-                  {sel.shelves?.map((s:any) => {
-                    const sBooks = sel.books?.filter((b:any) => b.shelfId === s.id) || [];
-                    const sMins = sBooks.reduce((a:number, b:any) => a + (b.timeSpentSeconds||0), 0);
-                    return (
-                      <div key={s.id} style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', marginBottom: '8px', borderLeft: `3px solid ${s.color}` }}>
-                        <p style={{ fontWeight: 800, color: s.color }}>{s.name}</p>
-                        <p style={{ fontSize: '0.75rem', color: '#999' }}>{sBooks.length} كتاب • {secToMin(sMins)} دقيقة قراءة</p>
-                        {sBooks.map((b:any) => (
-                          <div key={b.id} style={{ fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between', marginTop: '4px', paddingLeft: '12px' }}>
-                            <span>{b.title}</span>
-                            <span style={{ color: 'var(--accent)', fontWeight: 800 }}>{secToMin(b.timeSpentSeconds)} د</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })}
-
-                  {/* Total Focus */}
-                  <div style={{ textAlign: 'center', padding: '24px', background: 'rgba(60,255,100,0.05)', borderRadius: '18px', marginTop: '16px' }}>
-                    <p style={{ color: '#3cff64', fontSize: '0.75rem', letterSpacing: '2px' }}>إجمالي وقت القراءة</p>
+export default Dashboard;
+      <p style={{ color: '#3cff64', fontSize: '0.75rem', letterSpacing: '2px' }}>إجمالي وقت القراءة</p>
                     <h2 style={{ fontSize: '3rem', fontWeight: 900 }}>{sel.readingStats?.totalMinutes||0}<span style={{ fontSize: '1rem' }}> دقيقة</span></h2>
                   </div>
                 </div>
