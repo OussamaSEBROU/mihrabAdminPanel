@@ -112,6 +112,7 @@ const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const [stats, setStats] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'online'|'offline'|'checking'>('checking');
 
   const fmt = (ts: any) => ts ? new Date(ts).toLocaleString(isAr ? 'ar-DZ' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
   const fmtDate = (ts: any) => ts ? new Date(ts).toLocaleDateString(isAr ? 'ar-DZ' : 'en-US') : '—';
@@ -135,12 +136,14 @@ const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     try {
       setSyncing(true);
       const h = headers();
-      const [uRes, mRes] = await Promise.all([
+      const [uRes, mRes, tRes] = await Promise.all([
         axios.get(`${API}/admin/users`, { headers: h }).catch(() => ({ data: [] })),
-        axios.get(`${API}/admin/metrics`, { headers: h }).catch(() => ({ data: {} }))
+        axios.get(`${API}/admin/metrics`, { headers: h }).catch(() => ({ data: {} })),
+        axios.get(`${API}/test`).catch(() => ({ data: { status: 'offline' } }))
       ]);
       setUsers(uRes.data || []);
       setStats(mRes.data || {});
+      setServerStatus(tRes.data?.status === 'online' ? 'online' : 'offline');
       if (sel) {
         const fresh = (uRes.data||[]).find((u:any) => u.deviceId === sel.deviceId);
         if (fresh) setSel(fresh);
@@ -217,7 +220,17 @@ const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       <main style={{ [isAr ? 'marginRight' : 'marginLeft']: '280px', flex: 1, padding: '30px', overflowY: 'auto' }}>
         <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 style={{ fontSize: '2rem', fontWeight: 900 }}>{t.title}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 style={{ fontSize: '2rem', fontWeight: 900 }}>{t.title}</h1>
+              <div style={{ 
+                width: '10px', 
+                height: '10px', 
+                borderRadius: '50%', 
+                background: serverStatus === 'online' ? '#3cff64' : serverStatus === 'offline' ? '#ff3a3a' : '#ff9f43',
+                boxShadow: serverStatus === 'online' ? '0 0 10px #3cff64' : 'none',
+                marginTop: '10px'
+              }} title={serverStatus === 'online' ? 'Server Online' : 'Server Offline'} />
+            </div>
             <p style={{ color: '#3cff64', fontSize: '0.85rem' }}>{t.connected}: {users.length} {isAr ? 'مستخدم' : 'users'}</p>
           </div>
           <button onClick={fetchData} className="glow-btn" style={{ padding: '10px 20px', fontSize: '0.85rem' }}><RefreshCw size={16}/> {t.refresh}</button>
