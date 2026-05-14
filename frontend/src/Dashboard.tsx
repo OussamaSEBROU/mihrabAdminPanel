@@ -360,35 +360,6 @@ const MetricCard = ({ title, value, icon, sub }: any) => (
 );
 
 // ===== STYLES =====
-const sidebarSt: React.CSSProperties = { width:'280px', height:'100vh', position:'fixed', display:'flex', flexDirection:'column', justifyContent:'space-between', zIndex:10 };
-const layoutSt: React.CSSProperties = { display:'flex', background:'#050505', minHeight:'100vh', color:'#fff' };
-const logoSt: React.CSSProperties = { width:'50px', height:'50px', background:'#ff3c3c', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.8rem', fontWeight:900, margin:'0 auto' };
-const navIt: React.CSSProperties = { display:'flex', alignItems:'center', gap:'12px', padding:'12px 20px', borderRadius:'12px', cursor:'pointer', color:'rgba(255,255,255,0.5)', transition:'0.3s', marginBottom:'6px', fontSize:'0.9rem' };
-const navAct = { ...navIt, background:'rgba(255,60,60,0.1)', color:'#ff3c3c', fontWeight:800 } as React.CSSProperties;
-const expBtn: React.CSSProperties = { width:'100%', padding:'10px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', borderRadius:'10px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', fontSize:'0.8rem' };
-const logoutSt: React.CSSProperties = { background:'none', border:'none', color:'#ff3c3c', cursor:'pointer', fontWeight:700, padding:'20px 0 0', display:'flex', alignItems:'center', gap:'8px', fontSize:'0.85rem' };
-const rowSt: React.CSSProperties = { padding:'14px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer', borderRadius:'14px', background:'rgba(255,255,255,0.02)', marginBottom:'8px', transition:'0.2s' };
-const avSt: React.CSSProperties = { width:'40px', height:'40px', borderRadius:'50%', background:'rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'center', color:'#ff3c3c' };
-const ovSt: React.CSSProperties = { position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.92)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px' };
-const mdSt: React.CSSProperties = { width:'1000px', maxWidth:'95vw', maxHeight:'90vh', padding:'40px', borderRadius:'28px', position:'relative', overflowY:'auto' };
-const centerSt: React.CSSProperties = { height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#050505', color:'white', fontWeight:900, letterSpacing:'2px', fontSize:'1.2rem' };
-const smBtn: React.CSSProperties = { background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', borderRadius:'8px', cursor:'pointer', padding:'6px 8px', display:'flex', alignItems:'center' };
-
-export default Dashboard;
-      <p style={{ color: '#3cff64', fontSize: '0.75rem', letterSpacing: '2px' }}>إجمالي وقت القراءة</p>
-                    <h2 style={{ fontSize: '3rem', fontWeight: 900 }}>{sel.readingStats?.totalMinutes||0}<span style={{ fontSize: '1rem' }}> دقيقة</span></h2>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-// ===== STYLES =====
 const sidebarSt: React.CSSProperties = { width:'280px', height:'100vh', position:'fixed', borderRight:'1px solid rgba(255,255,255,0.05)', display:'flex', flexDirection:'column', justifyContent:'space-between', zIndex:10 };
 const layoutSt: React.CSSProperties = { display:'flex', background:'#050505', minHeight:'100vh', color:'#fff' };
 const logoSt: React.CSSProperties = { width:'50px', height:'50px', background:'#ff3c3c', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.8rem', fontWeight:900, margin:'0 auto' };
