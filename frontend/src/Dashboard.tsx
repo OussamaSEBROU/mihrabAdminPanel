@@ -252,6 +252,26 @@ const Dashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 <MetricCard title={t.downloads} value={stats.globalDownloads||0} icon={<Download color="#ff3a3a"/>}/>
               </div>
 
+              {/* Live Sync Logs */}
+              <div className="glass-panel" style={{ marginTop: '20px', padding: '20px', background: 'rgba(60,255,100,0.02)', border: '1px solid rgba(60,255,100,0.1)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' }}>
+                  <h4 style={{ color:'#3cff64', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'8px' }}>
+                    <RefreshCw size={16} className={syncing?'spin':''}/> {isAr ? 'سجل المزامنة المباشر' : 'Live Sync Monitor'}
+                  </h4>
+                  <span style={{ fontSize:'0.7rem', color:'#666' }}>{isAr ? 'آخر 5 نبضات' : 'Last 5 pulses'}</span>
+                </div>
+                <div style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                  {users.sort((a,b) => new Date(b.lastSync).getTime() - new Date(a.lastSync).getTime()).slice(0, 5).map(u => (
+                    <div key={u._id} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+                      <span style={{color:'#888'}}>[{new Date(u.lastSync).toLocaleTimeString()}]</span>
+                      <span style={{color:'#fff'}}>Device_{u.deviceId?.slice(0,6)}</span>
+                      <span style={{color:'#3cff64', fontWeight:700}}>{u.activeStatus}</span>
+                    </div>
+                  ))}
+                  {users.length === 0 && <p style={{color:'#666', textAlign:'center'}}>Waiting for app signal...</p>}
+                </div>
+              </div>
+
               <div className="glass-panel" style={{ marginTop: '24px', padding: '24px' }}>
                 <h3 style={{ marginBottom: '16px' }}>{t.recentActivity}</h3>
                 {users.slice(0, 8).map(u => (
